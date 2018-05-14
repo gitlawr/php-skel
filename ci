@@ -1,0 +1,15 @@
+if [ ! -f Dockerfile ]; then
+  echo "Dockerfile not found, preparing a default php Dockerfile"
+  cp /scripts/Dockerfile ./Dockerfile
+fi
+apt-get update && \
+    apt-get install -y --no-install-recommends git zip libsqlite3-dev zlib1g-dev
+docker-php-ext-install zip
+curl --silent --show-error https://getcomposer.org/installer | php
+./composer.phar install -n --prefer-dist
+touch storage/testing.sqlite
+php artisan migrate --env=testing --database=sqlite_testing --force
+./vendor/bin/codecept build
+./vendor/bin/codecept run
+
+
