@@ -1,11 +1,3 @@
-FROM php
-COPY ./ /app/root/
-RUN cd /app/root && apt-get update && \
-    apt-get install -y --no-install-recommends git zip libsqlite3-dev zlib1g-dev && \
-docker-php-ext-install zip && \
-curl --silent --show-error https://getcomposer.org/installer | php && \
-./composer.phar install -n --prefer-dist && \
-touch storage/testing.sqlite && touch storage/database.sqlite && cp .env.testing .env && \
-php artisan migrate && \
-php artisan migrate --env=testing --database=sqlite_testing --force 
-CMD ["php","-S","0.0.0.0:80","-t","/app/root/public"]
+FROM lawr/php-skel
+COPY ./ /var/www/html/
+RUN cd /var/www/html && /scripts/ci

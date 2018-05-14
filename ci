@@ -2,14 +2,43 @@ if [ ! -f Dockerfile ]; then
   echo "Dockerfile not found, preparing a default php Dockerfile"
   cp /scripts/Dockerfile ./Dockerfile
 fi
-apt-get update && \
-    apt-get install -y --no-install-recommends git zip libsqlite3-dev zlib1g-dev
-docker-php-ext-install zip
-curl --silent --show-error https://getcomposer.org/installer | php
-./composer.phar install -n --prefer-dist
-touch storage/testing.sqlite
-php artisan migrate --env=testing --database=sqlite_testing --force
-./vendor/bin/codecept build
-./vendor/bin/codecept run
 
+if [ -f composer.json ]; then
+  echo "Found 'composer.json', installing dependencies using composer.phar... "
 
+  # Install Composer
+  TEMPFILE=$(mktemp)
+  RETRIES=6
+  for ((i=0; i<$RETRIES; i++)); do
+
+    if [ -z "$COMPOSER_INSTALLER" ]; then
+      export COMPOSER_INSTALLER="https://getcomposer.org/installer"
+    fi
+
+    echo "Downloading $COMPOSER_INSTALLER, attempt $((i+1))/$RETRIES"
+    curl -o $TEMPFILE $COMPOSER_INSTALLER && break
+    sleep 10
+  done
+  if [[ $i == $RETRIES ]]; then
+    echo "Download failed, giving up."
+    exit 1
+  fi
+  php <$TEMPFILE
+
+  if [ "$(ls -a /tmp/artifacts/ 2>/dev/null)" ]; then
+    echo "Restoring build artifacts"
+    mv /tmp/artifacts/* $HOME/
+  fi
+
+  # Change the repo mirror if provided
+  if [ -n "$COMPOSER_MIRROR" ]; then
+    ./composer.phar config -g repositories.packagist composer $COMPOSER_MIRROR
+  fi
+
+  # Install App dependencies using Composer
+  ./composer.phar install --no-interaction --no-ansi --optimize-autoloader $COMPOSER_ARGS
+
+  if [ ! -f composer.lock ]; then
+    echo -e "\nConsider adding a 'composer.lock' file into your source repository.\n"
+  fi
+fi
